@@ -1,0 +1,12 @@
+[package]
+name = "skald-ast"
+description = "Skald YAML AST: the Node representation tree, composer, and emitter."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+skald-core.workspace = true

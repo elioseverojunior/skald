@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  # The `-D warnings` build gate now lives in .cargo/config.toml ([build]
+  # rustflags), shared by local + CI. (The old `RUST_FLAGS` here was a no-op
+  # typo — the env var is RUSTFLAGS — so this gate never actually ran in CI.)
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check, Lint, Test
+    runs-on: ${{ vars.RUNS_ON }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Doc-tests
+        run: cargo test --doc --workspace
+
+  supply-chain:
+    name: Supply Chain
+    runs-on: ${{ vars.RUNS_ON }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny and cargo-audit
+        # Prebuilt binaries (~10s) instead of `cargo install --locked`,
+        # which is slow and fragile when transitive deps regress on
+        # newer toolchains.
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,cargo-audit
+
+      # Order matters: cargo audit must run before cargo deny so that
+      # audit can clone the RustSec advisory-db into a fresh
+      # ~/.cargo/advisory-db. cargo deny's `advisories` check
+      # pre-populates that same directory, and cargo audit refuses to
+      # clone into a non-empty dir ("Refusing to initialize the
+      # non-empty directory").
+      - name: cargo audit
+        run: cargo audit
+
+      - name: cargo deny
+        run: cargo deny check
+
+  vet:
+    name: cargo vet
+    runs-on: ${{ vars.RUNS_ON }}
+    # Non-blocking until the audit set is populated (`cargo vet certify ...`).
+    # Flip to blocking by removing continue-on-error once the tree is audited.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-vet
+      - name: cargo vet
+        run: cargo vet --locked || cargo vet
+
+  coverage:
+    name: Coverage
+    # Runs on macOS: tarpaulin's ptrace engine (Linux default) systematically
+    # under-attributes executed lines here (reporting ~94% where every line is
+    # actually exercised), and `--engine llvm` falls back to ptrace on Linux in
+    # 0.35.4. macOS uses the source-based llvm engine natively, which reports the
+    # true 100%. Measurement engine only — the --fail-under 100 gate is unchanged.
+    runs-on: ${{ vars.RUNS_ON }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          # tarpaulin's llvm engine shells out to llvm-profdata / llvm-cov.
+          components: llvm-tools-preview
+
+      # Tarpaulin's --run-types Doctests invokes `cargo +nightly test --doc`
+      # under the hood (doctest coverage instrumentation uses nightly-only
+      # -Z flags). Pre-install nightly here so it's not downloaded on the
+      # hot path mid-tarpaulin-run, where transient rustup download races
+      # have aborted the job (e.g. run 25680492371: "could not rename
+      # 'downloaded' file ... .partial").
+      #
+      # `rustup toolchain install` (vs `dtolnay/rust-toolchain@nightly`)
+      # installs without changing the default — stable still drives the
+      # workspace build; nightly is only used when tarpaulin explicitly
+      # invokes +nightly for doctests.
+      - name: Install nightly toolchain for doctest instrumentation
+        run: rustup toolchain install nightly --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install tarpaulin
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-tarpaulin
+
+      - name: Run coverage
+        # Target is 100% line coverage. This gate stays red until tests
+        # close the gap — that is the intended forcing function.
+        # Doctests are included so the 27 doc-test coverage counts.
+        #
+        # --engine llvm: the default ptrace engine systematically
+        # under-attributes executed lines on this codebase (e.g. it reported
+        # parser at 473/549 while the source-based llvm engine reports
+        # 549/549) and miscounts integration-test files. The llvm engine is
+        # source-based and accurate; engine = "llvm" is also set in
+        # tarpaulin.toml so local/Makefile runs match.
+        run: |
+          cargo tarpaulin --workspace --engine llvm \
+            --run-types Tests --run-types Doctests \
+            --fail-under 100 --out Xml
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: cobertura.xml

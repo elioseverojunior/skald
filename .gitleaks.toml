@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 Skald contributors
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# gitleaks configuration ~ https://github.com/gitleaks/gitleaks
+#
+# Inherits the full upstream ruleset (AWS, GCP, GitHub, Slack, private keys, …)
+# via [extend] and layers repo-specific allowlists to suppress known false
+# positives. detect-secrets (.secrets.baseline) runs alongside this — the two
+# are complementary scanners, not redundant.
+
+title = "Skald gitleaks config"
+
+[extend]
+# Pull in gitleaks' maintained ruleset rather than re-deriving ~150 rules here.
+# Upstream rule fixes then flow in on every gitleaks upgrade.
+useDefault = true
+
+[[allowlists]]
+description = "Repo-wide false positives: vendored data, generated/build files, license texts"
+# `paths` are regexes matched against the file path (relative to repo root).
+# Allowlisting by path keeps detection strong on real source while carving out
+# files that are data, not credentials.
+paths = [
+  # Upstream YAML Test Suite — third-party fixtures full of arbitrary,
+  # high-entropy strings that are test data, never real secrets.
+  '''crates/skald-yaml-test-suite/data/.*''',
+  # Cargo's lockfile — package checksums trip entropy heuristics.
+  '''Cargo\.lock$''',
+  # Build artifacts (gitignored, but excluded here for `gitleaks dir` scans).
+  '''target/.*''',
+  # detect-secrets baseline stores hashes/snippets of already-flagged strings.
+  '''\.secrets\.baseline$''',
+  # License texts and their per-crate symlinks.
+  '''LICENSES/.*''',
+  '''(^|/)LICENSE-(MIT|APACHE)$''',
+  # This config itself, so any example patterns below never self-trigger.
+  '''\.gitleaks\.toml$''',
+]
+
+# ---------------------------------------------------------------------------
+# Add project-specific detectors here as the codebase grows. Template:
+#
+# [[rules]]
+# id = "skald-internal-token"
+# description = "Skald internal service token"
+# regex = '''skald_(test|live)_[0-9a-zA-Z]{32}'''
+# keywords = ["skald_"]
+# ---------------------------------------------------------------------------

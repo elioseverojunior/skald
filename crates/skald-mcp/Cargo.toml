@@ -1,0 +1,17 @@
+[package]
+name = "skald-mcp"
+description = "MCP server exposing parse, validate, edit, and format tools for YAML."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "skald-mcp"
+path = "src/main.rs"
+
+[dependencies]
+serde_json.workspace = true
+skald = { workspace = true, features = ["ast", "cst", "schema"] }

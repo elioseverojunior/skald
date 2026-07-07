@@ -1,0 +1,27 @@
+# @generated from commit-types.toml by scripts/commit-config.py — DO NOT EDIT
+# Regenerate with `mise run commit-config`; `mise run commit-config-check` guards drift.
+#
+# committed ~ https://github.com/crate-ci/committed
+style = "conventional"
+subject_length = 50
+subject_capitalized = false
+subject_not_punctuated = true
+imperative_subject = true
+line_length = 72
+no_wip = true
+no_fixup = true
+merge_commit = true
+allowed_types = [
+  "feat",
+  "fix",
+  "refactor",
+  "docs",
+  "perf",
+  "style",
+  "test",
+  "chore",
+  "ci",
+  "build",
+  "init",
+  "revert",
+]

@@ -1,0 +1,163 @@
+# lefthook ~ https://lefthook.dev
+#
+# pre-commit (fail-fast, sequential) runs: file-hygiene fixes, secret scanning,
+# YAML lint, Markdown lint (GitHub ruleset), REUSE/SPDX compliance, commit-config
+# drift guard, dependency audit + deny on lockfile changes, and rustfmt + clippy
+# on Rust changes. commit-msg
+# lints the message with committed; post-commit regenerates CHANGELOG.md and
+# folds it into the just-made commit. This is the lefthook-native replacement
+# for the legacy .pre-commit-config.yaml (see docs for the mapping).
+# Run `lefthook install` (or `mise run hooks-install`) once to wire the git
+# hooks; mise owns the hook tooling (lefthook, git-cliff, committed, cargo-audit,
+# cargo-deny, gitleaks, yamllint, reuse, + the rust toolchain) so every
+# contributor and CI runner behaves identically.
+
+# Fail fast if a contributor committed without installing the hooks.
+assert_lefthook_installed: true
+
+pre-commit:
+  # Don't lint while a merge or rebase is in progress.
+  skip:
+    - merge
+    - rebase
+  # Run jobs sequentially, stopping at the first failure. This maps the old
+  # .pre-commit-config.yaml `fail_fast: true`, and guarantees the file-hygiene
+  # auto-fixer runs (and re-stages) before the readers below see the files.
+  piped: true
+  jobs:
+    - name: file-hygiene
+      # Replacement for the pre-commit/pre-commit-hooks repo (v6.0.0) via
+      # scripts/file-hygiene.py: large-file, merge-conflict, case-conflict,
+      # symlink, executable-shebang, TOML and JSON checks, plus the
+      # trailing-whitespace / end-of-file / mixed-line-ending FIXERS, which are
+      # applied in place and re-staged. check-yaml and detect-private-key are
+      # deliberately NOT reimplemented — yamllint and gitleaks below own those.
+      run: mise run hygiene-fix {staged_files}
+      stage_fixed: true
+    - name: gitleaks
+      # Secret/credential scan of the staged diff — our replacement for the
+      # pre-commit detect-secrets and detect-private-key hooks.
+      run: mise run gitleaks git --staged
+    - name: yamllint
+      # Lint only the staged YAML files (the test-suite submodule is excluded via
+      # .yamllint.yml's ignore). The `yamllint` task forwards these paths through
+      # and falls back to the whole repo when run manually with no args.
+      glob: "*.{yml,yaml}"
+      run: mise run yamllint {staged_files}
+    - name: actionlint
+      # Lint only staged GitHub Actions workflows with actionlint (syntax,
+      # expression typos, shellcheck on `run:` scripts, undefined `vars`/inputs;
+      # config in .github/actionlint.yaml). Scoped to .github/workflows because
+      # that is the only place actionlint understands; the `actionlint` task
+      # forwards these paths and falls back to all workflows when run manually.
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: mise run actionlint {staged_files}
+    - name: cargo-sort
+      # Sort [dependencies] tables in every Cargo.toml alphabetically. Runs on
+      # the whole workspace (cargo-sort resolves members itself) whenever any
+      # Cargo.toml is staged, and BEFORE taplo so taplo gets the final format
+      # pass. Re-stages anything it rewrites.
+      glob: "**/Cargo.toml"
+      run: mise run cargo-sort
+      stage_fixed: true
+    - name: taplo
+      # Format every staged .toml with taplo (config in taplo.toml) — the TOML
+      # formatter of record. Runs after cargo-sort so the two never fight
+      # (taplo does not reorder; cargo-sort owns dep ordering). Re-stages fixes.
+      glob: "*.toml"
+      run: mise run taplo {staged_files}
+      stage_fixed: true
+    - name: markdownlint
+      # Markdown lint using GitHub's ruleset (@github/markdownlint-github):
+      # accessibility rules GH001-003 plus markdownlint defaults, with project
+      # overrides in .markdownlint-cli2.mjs. Auto-fixes blank-line rules
+      # (MD022/MD032) and re-stages; unfixable findings block. This replaces the
+      # legacy pre-commit markdown-format-check (`make check-markdown`, no Makefile).
+      glob: "*.md"
+      run: mise run markdownlint-fix {staged_files}
+      stage_fixed: true
+    - name: reuse-fix
+      # Add/refresh the SPDX header on staged Rust source files (the project's
+      # per-file convention; .toml/.md are covered aggregately by REUSE.toml's
+      # `**` rule, so they're intentionally not annotated here). reuse-fix is
+      # idempotent — it normalizes to the repo's 2-line header form, so files
+      # that already carry it are left byte-identical (no churn). Runs before the
+      # reuse lint below and re-stages any file it annotates.
+      glob: "*.rs"
+      run: mise run reuse-fix {staged_files}
+      stage_fixed: true
+    - name: reuse
+      # REUSE/SPDX licensing is a project-wide invariant — a single new file
+      # without a license header breaks compliance — so this lints the whole
+      # tree on every commit rather than filtering by staged paths. The check is
+      # fast and the `reuse` task defaults to `lint`.
+      run: mise run reuse
+    - name: commit-config
+      # Conventional-commit types live once in commit-types.toml; committed.toml,
+      # cliff.toml's parsers, and .gitmessage are generated from it. This drift
+      # guard fails the commit if any of those files (or the generator/manifest)
+      # is staged while out of sync — run `mise run commit-config` to fix.
+      glob: "{commit-types.toml,scripts/commit-config.py,committed.toml,cliff.toml,.gitmessage}"
+      run: mise run commit-config-check
+    - name: audit
+      # Scan dependencies against the RustSec advisory DB (cargo-audit, per
+      # .cargo/audit.toml). Gated on the dependency graph: it only runs when
+      # Cargo.lock/Cargo.toml is staged, so most commits skip it entirely. This
+      # keeps everyday commits fast and offline-safe (audit fetches the advisory
+      # DB over the network) while still catching a vulnerable dep the moment it
+      # enters the lockfile.
+      glob: "{Cargo.lock,Cargo.toml,**/Cargo.toml}"
+      run: mise run audit
+    - name: deny
+      # cargo-deny supply-chain policy — licenses, bans, advisories, sources
+      # (the pre-commit rust-deny hook). Gated on dependency/policy changes so
+      # everyday commits skip it.
+      glob: "{Cargo.lock,Cargo.toml,**/Cargo.toml,deny.toml}"
+      run: mise run deny
+    - name: fmt-check
+      # rustfmt gate, check-only (the pre-commit rust-fmt hook).
+      glob: "*.rs"
+      run: mise run fmt-check
+    - name: clippy
+      # clippy at the project standard `-D warnings` (the pre-commit rust-clippy
+      # hooks, using our canonical invocation rather than pedantic/nursery).
+      # Heaviest job, so it runs last under fail-fast.
+      glob: "*.rs"
+      run: mise run clippy
+
+commit-msg:
+  # Don't lint generated/auto messages produced during a merge or rebase.
+  skip:
+    - merge
+    - rebase
+  jobs:
+    - name: committed
+      # Validate the in-progress commit message against committed.toml (itself
+      # generated from commit-types.toml). {1} is the path to the message file
+      # git passes to the commit-msg hook.
+      run: mise run commit-lint --commit-file {1}
+
+post-commit:
+  # Never rewrite commits while a merge or rebase is in progress.
+  skip:
+    - merge
+    - rebase
+  jobs: []
+    # - name: changelog
+    #   # The just-created commit now exists, so regenerate the changelog to
+    #   # include it and fold the result back into that same commit. `LEFTHOOK=0`
+    #   # disables every lefthook hook for the amend invocation, so this cannot
+    #   # recurse; the `git diff` guard makes it a no-op when nothing changed.
+    #   #
+    #   # KNOWN TRADE-OFF (accepted): the commit-SHA link git-cliff writes into the
+    #   # changelog references the pre-amend commit, which the amend orphans, so
+    #   # that `.../commit/<sha>` link 404s once pushed. The entry text is correct;
+    #   # only the hyperlink is stale. This is inherent — a commit cannot embed its
+    #   # own post-amend hash.
+    #   run: |
+    #     mise run changelog
+    #     if git diff --quiet -- CHANGELOG.md; then
+    #       exit 0
+    #     fi
+    #     git add CHANGELOG.md
+    #     LEFTHOOK=0 git commit -S --amend --no-edit --no-verify

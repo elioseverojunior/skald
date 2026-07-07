@@ -1,0 +1,52 @@
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+
+# >>> commit-config:types (generated from commit-types.toml — do not edit) >>>
+# Type can be:
+#   feat      (a new feature)
+#   fix       (a bug fix)
+#   refactor  (a change that neither fixes a bug nor adds a feature)
+#   docs      (documentation only changes)
+#   perf      (a performance improvement)
+#   style     (formatting, whitespace; no code-behavior change)
+#   test      (adding or correcting tests; no production code change)
+#   chore     (tooling, configs, housekeeping; no production code change)
+#   ci        (changes to CI configuration files and scripts)
+#   build     (changes to the build system or external dependencies)
+#   init      (initialize a repository (allowed so a fresh repo can bootstrap))
+#   revert    (revert a previous commit)
+# <<< commit-config:types <<<
+#
+# Scope is optional and can be:
+#   parser, emitter, scanner, composer, constructor, lib, cli, docs, tests, etc.
+#
+# Subject line:
+#   - use imperative, present tense: "change" not "changed" nor "changes"
+#   - don't capitalize first letter
+#   - no dot (.) at the end
+#   - 50 characters or less
+#
+# Body:
+#   - use imperative, present tense
+#   - include motivation for the change and contrasts with previous behavior
+#   - wrap at 72 characters
+#
+# Footer:
+#   - reference GitHub issues: "Closes #123", "Fixes #456"
+#   - breaking changes: "BREAKING CHANGE: description"
+#   - semver control: "+semver: major|minor|patch|none"
+#   - CI control: "[skip ci]" or "[ci skip]" to skip CI builds
+#
+# Examples:
+#   feat(parser): add support for complex mapping keys
+#   fix(emitter): resolve string quoting for version numbers
+#   docs: update installation instructions
+#   test(parser): add edge case tests for deeply nested structures
+#   chore: bump version to 1.1.0 [skip ci]
+#   feat: implement comment preservation
+#
+#   BREAKING CHANGE: API interface redesigned
+#   +semver: major

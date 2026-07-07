@@ -1,0 +1,117 @@
+---
+# Codecov configuration ~ https://docs.codecov.com/docs/codecov-yaml
+#
+# Coverage is produced by cargo-tarpaulin (llvm engine, Tests + Doctests) as a
+# Cobertura report (cobertura.xml) and uploaded under the `tarpaulin` flag — see
+# the `coverage` / `codecov` mise tasks and .github/workflows/ci.yml. The project
+# enforces a non-negotiable 100% line-coverage gate (CLAUDE.md); this file mirrors
+# that policy and breaks coverage down per workspace crate for codebase analysis.
+
+codecov:
+  require_ci_to_pass: true
+  notify:
+    # One coverage job uploads a single report — notify once it lands.
+    after_n_builds: 1
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "90...100"
+  status:
+    project:
+      default:
+        target: 100%   # match the tarpaulin --fail-under 100 gate
+        threshold: 0%   # no regression tolerated
+        flags:
+          - tarpaulin
+    patch:
+      default:
+        target: 100%   # every new or changed line must be covered
+        threshold: 0%
+        flags:
+          - tarpaulin
+    changes: false
+
+# Per-crate breakdown — the "codebase analysis" view in the Codecov dashboard.
+# Component statuses are informational: the workspace-level project status above
+# and the tarpaulin CI gate are the blocking checks, so these add per-crate
+# visibility without spamming a required check for every crate on each PR.
+component_management:
+  default_rules:
+    flag_regexes:
+      - tarpaulin
+    statuses:
+      - type: project
+        target: 100%
+        threshold: 0%
+        informational: true
+  individual_components:
+    - component_id: skald
+      name: skald (facade)
+      paths:
+        - crates/skald/**
+    - component_id: skald-core
+      name: skald-core
+      paths:
+        - crates/skald-core/**
+    - component_id: skald-ast
+      name: skald-ast
+      paths:
+        - crates/skald-ast/**
+    - component_id: skald-cst
+      name: skald-cst
+      paths:
+        - crates/skald-cst/**
+    - component_id: skald-serde
+      name: skald-serde
+      paths:
+        - crates/skald-serde/**
+    - component_id: skald-schema
+      name: skald-schema
+      paths:
+        - crates/skald-schema/**
+    - component_id: skald-fmt
+      name: skald-fmt
+      paths:
+        - crates/skald-fmt/**
+    - component_id: skald-lsp
+      name: skald-lsp
+      paths:
+        - crates/skald-lsp/**
+    - component_id: skald-mcp
+      name: skald-mcp
+      paths:
+        - crates/skald-mcp/**
+    - component_id: skald-validate
+      name: skald-validate
+      paths:
+        - crates/skald-validate/**
+    - component_id: skald-wasm
+      name: skald-wasm
+      paths:
+        - crates/skald-wasm/**
+
+flags:
+  tarpaulin:
+    paths:
+      - crates/
+    carryforward: false
+
+# Files Codecov leaves out of the denominator. These mirror the tarpaulin
+# exclude set (host-untestable entry/ABI boilerplate) plus the fuzz crate and
+# vendored corpus, which are not measured at all — so Codecov's total matches
+# the tarpaulin gate exactly.
+ignore:
+  - "crates/*/src/main.rs"                  # CLI entry points (argv/stdin/exit)
+  - "crates/skald-wasm/src/lib.rs"          # wasm-bindgen ABI glue
+  - "crates/skald-fuzz/**"                  # own workspace; not a coverage target
+  - "crates/skald-yaml-test-suite/data/**"  # vendored YAML conformance corpus
+
+comment:
+  layout: "header, diff, flags, components, files, footer"
+  behavior: default
+  require_changes: false
+
+github_checks:
+  annotations: true

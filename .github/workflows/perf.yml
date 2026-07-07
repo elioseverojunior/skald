@@ -1,0 +1,154 @@
+name: Performance
+
+# Per-change benchmark gate. Compares the PR/commit against the baseline
+# stored on the `gh-pages` branch and fails the run on a measurable
+# regression. The baseline is only updated by pushes to `main`.
+#
+# Security note: this workflow does not interpolate any user-controlled
+# content (issue/PR titles, commit messages, head_ref, etc.) into `run:`
+# steps. All `${{ }}` usages are either repo metadata in action inputs
+# or conditional gates.
+#
+# First-time setup (one-off):
+#   1. Create an empty `gh-pages` branch:
+#        git checkout --orphan gh-pages && git rm -rf . && \
+#        git commit --allow-empty -m "init gh-pages" && \
+#        git push origin gh-pages
+#   2. In repo Settings -> Pages, point Pages at the `gh-pages` branch
+#      (optional -- only needed to view the historical dashboard).
+#   3. In repo Settings -> Actions -> General -> Workflow permissions,
+#      ensure "Read and write permissions" is enabled (required for the
+#      action to push the updated baseline).
+
+on:
+  # Auto-triggers disabled: the benchmark gate is flaky on shared CI runners
+  # (noisy neighbours skew timings and fail PRs on phantom regressions). Run it
+  # manually via the Actions tab / `gh workflow run perf.yml` when needed.
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - "skald-core/**"
+  #     - "skald-serde/**"
+  #     - "skald/**"
+  #     - "skald-bench/**"
+  #     - "Cargo.toml"
+  #     - "Cargo.lock"
+  #     - ".github/workflows/perf.yml"
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     - "skald-core/**"
+  #     - "skald-serde/**"
+  #     - "skald/**"
+  #     - "skald-bench/**"
+  #     - "Cargo.toml"
+  #     - "Cargo.lock"
+  #     - ".github/workflows/perf.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write       # required to push the updated baseline to gh-pages
+  pull-requests: write  # required to post the comparison comment on PRs
+  deployments: write    # required by benchmark-action for environments
+
+concurrency:
+  group: perf-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CRITERION_HOME: ${{ github.workspace }}/target/criterion
+
+jobs:
+  benchmark:
+    name: Bench vs main baseline
+    runs-on: ${{ vars.RUNS_ON }}
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: perf
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Print runner profile
+        run: |
+          echo "::group::Runner profile"
+          echo "CPUs: $(nproc)"
+          echo "Mem:  $(free -h | awk '/Mem:/ {print $2}')"
+          uname -a
+          rustc --version
+          echo "::endgroup::"
+
+      - name: Reduce CPU frequency variance
+        run: |
+          sudo cpupower frequency-set --governor performance \
+            || echo "cpupower unavailable; continuing with default governor"
+
+      - name: Build benchmarks (warm cache, fail fast on compile errors)
+        run: cargo bench -p skald-bench --no-run
+
+      - name: Run benchmarks (bencher output format)
+        run: |
+          cargo bench -p skald-bench -- --output-format bencher \
+            | tee bench-output.txt
+
+      - name: Sanity-check parseable output
+        run: |
+          if ! grep -q "ns/iter" bench-output.txt; then
+            echo "::error::No 'ns/iter' lines found in bench-output.txt."
+            echo "Criterion may have failed before producing measurements."
+            tail -n 50 bench-output.txt
+            exit 1
+          fi
+          echo "Parsed $(grep -c 'ns/iter' bench-output.txt) benchmark measurements."
+
+      - name: Compare against baseline
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Skald benchmarks
+          tool: cargo
+          output-file-path: bench-output.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: benchmarks
+
+          # Only update the baseline from main pushes; PRs are read-only.
+          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-data-file: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+          # Regression gate thresholds (ratio of current/baseline).
+          #   150% -> 50% slower than baseline triggers a warning comment.
+          #   200% -> 100% slower fails the job.
+          alert-threshold: "150%"
+          fail-threshold: "200%"
+          fail-on-alert: true
+
+          summary-always: true
+          comment-on-alert: true
+          alert-comment-cc-users: "@${{ github.repository_owner }}"
+
+      - name: Upload Criterion HTML reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: criterion-reports-${{ github.run_id }}
+          path: target/criterion/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload bencher-format measurements
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bench-output-${{ github.run_id }}
+          path: bench-output.txt
+          retention-days: 90

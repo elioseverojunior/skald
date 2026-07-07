@@ -1,0 +1,12 @@
+[package]
+name = "skald-core"
+description = "Core YAML 1.2.2 scanner, parser, and composer — safe, fast, spec-complete"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+
+[dev-dependencies]

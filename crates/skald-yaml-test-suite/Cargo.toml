@@ -1,0 +1,12 @@
+[package]
+name = "skald-yaml-test-suite"
+description = "YAML test suite integration for skald (dev-only, not published)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+skald-core.workspace = true

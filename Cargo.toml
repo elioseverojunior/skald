@@ -1,0 +1,222 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+# skald-fuzz declares its own [workspace] (cargo-fuzz requirement), so it must
+# be excluded from the virtual workspace glob above.
+exclude = ["crates/skald-fuzz"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+documentation = "https://docs.rs/skald"
+repository = "https://github.com/elioetibr/skald"
+rust-version = "1.88"
+description = "A safe and fast rust library. It's a rust natively YAML 1.2 implementation with YAML 1.1 backward compatibility"
+keywords = ["configuration", "markup", "parser", "serialization", "yaml"]
+categories = ["config", "encoding", "parser-implementations"]
+authors = ["Elio Severo Junior <elioseverojunior@gmail.com>"]
+readme = "README.md"
+
+[workspace.lints.rust]
+rust_2018_idioms = { level = "warn", priority = -1 }
+unnameable_types = "warn"
+unreachable_pub = "warn"
+unsafe_op_in_unsafe_fn = "warn"
+unused_lifetimes = "warn"
+unused_macro_rules = "warn"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+# Lint GROUPS this workspace opts into (all default to `allow`; we raise them to
+# `warn`). priority = -1 so the per-lint overrides further down win over the
+# groups (clippy requires group priority < lint priority for the override to
+# apply). NOTE on "warn" vs "deny": the warnings-as-errors policy lives in ONE
+# place — `-D warnings` in .cargo/config.toml — which escalates EVERY warning
+# (rustc + clippy, local + CI) into a hard error. So "warn" here already means
+# "deny in practice"; writing "deny" per-group would scatter that single policy.
+#   * pedantic — stricter, opinionated correctness/clarity lints.
+#   * nursery  — newer lints still being refined (may evolve); enabled per request.
+#   * cargo    — Cargo.toml hygiene: wildcard/`*` deps, missing metadata, feature names.
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
+# --- per-lint opt-ins (individual `restriction`-group lints) -----------------
+# The `restriction` group as a whole is too opinionated (many mutually exclusive
+# lints) to enable, so we opt in to just the two that the project's clippy.toml
+# already tunes: production code must not `.unwrap()`/`.expect()` (a panic is a
+# DoS per CLAUDE.md), while `allow-unwrap-in-tests`/`allow-expect-in-tests` in
+# clippy.toml keep them ergonomic inside `#[cfg(test)]`.
+unwrap_used = "warn"
+expect_used = "warn"
+
+# --- per-lint opt-outs (default priority 0, so they outrank the groups above) ---
+# Duplicate *transitive* dependency versions are pulled in by upstream crates and
+# are outside this project's control; the rest of `cargo` stays a hard gate.
+multiple_crate_versions = "allow"
+# `redundant_pub_crate` (nursery) directly CONTRADICTS the stable rustc
+# `unreachable_pub` lint in [workspace.lints.rust]: the former wants `pub` on a
+# `pub(crate)` item inside a private module, the latter wants `pub(crate)` on a
+# `pub` item that isn't externally reachable. They can't both be satisfied, so the
+# nursery lint yields to the stable one — `pub(crate)` is the correct visibility.
+redundant_pub_crate = "allow"
+
+# Internal crates are declared here once; members bind to them with
+# `<crate>.workspace = true`. The `version` must match `workspace.package.version`
+# (0.0.0) — a path dependency's version requirement is still checked against the
+# real crate version, so a stale pin (e.g. 0.1.0) would fail to resolve.
+[workspace.dependencies]
+
+# Third-party dependencies shared by ≥2 members, pinned once here. Members bind
+# with `<dep>.workspace = true` and layer on extra `features` as needed.
+# `serde` is declared `default-features = false` so no_std-leaning crates inherit
+# a minimal build; every current consumer wants `std` (serde's only default
+# feature) + `derive`, so a bare `serde.workspace = true` reproduces what each
+# crate had before.
+serde = { version = "1", default-features = false, features = [
+  "std",
+  "derive",
+] }
+serde_json = "1"
+# `default-features = false` here so satellite crates inherit a minimal facade
+# and opt back in via `features = [...]`; cargo forbids a member flipping this
+# off if the workspace entry leaves it on.
+skald = { path = "crates/skald", version = "0.0.0", default-features = false }
+skald-ast = { path = "crates/skald-ast", version = "0.0.0" }
+skald-core = { path = "crates/skald-core", version = "0.0.0" }
+skald-cst = { path = "crates/skald-cst", version = "0.0.0" }
+skald-schema = { path = "crates/skald-schema", version = "0.0.0" }
+skald-serde = { path = "crates/skald-serde", version = "0.0.0" }
+# Pinned once so every crate that binds to JS/WASM shares one version.
+wasm-bindgen = "0.2"
+
+# --- Further perf-book levers (https://nnethercote.github.io/perf-book), DEFERRED ---
+# These are NOT [profile.*] settings, and are premature while the parser/binaries
+# are stubs — revisit once there is a real workload + criterion benches to measure:
+#   * target-cpu=native — ~10%+ via AVX/SIMD for the byte-scanner. NON-portable, so
+#     never bake it into distributed binaries; use only for LOCAL measurement, e.g.
+#     `RUSTFLAGS="-C target-cpu=native" mise run bench` to see the speed ceiling.
+#   * Alternative allocator (mimalloc / jemalloc) — large wins for allocation-heavy
+#     code, and a YAML parser is exactly that. Set a `#[global_allocator]` in each
+#     BINARY's main.rs (cli/lsp/mcp), never in the library. Defer until they do work.
+#   * PGO — ~10%+ via `mise run pgo` (cargo-pgo). Two-pass, needs representative
+#     input, and is NOT usable for crates.io-published binaries.
+# Methodology (perf-book): benchmark every change ONE at a time against the benches.
+
+[workspace.metadata.docs.rs]
+# Build docs with all features on docs.rs
+all-features = true
+# Specify arguments for rustdoc to enhance documentation quality
+rustdoc-args = [
+  "--generate-link-to-definition",
+  "--cfg",
+  "docsrs",
+  "--document-private-items",
+]
+# Specify targets for docs.rs to build
+targets = ["x86_64-unknown-linux-gnu"]
+exclude = [
+  "*.bak",
+  "*.log",
+  "*.profdata",
+  "*.profraw",
+  "*.swo",
+  # Editor and OS files
+  "*.swp",
+  "*.tmp",
+  "*~",
+  ".DS_Store",
+  # Development tools and configs
+  ".cargo/",
+  ".claude/",
+  ".clippy.toml",
+  # Version control
+  ".git/",
+  ".gitattributes",
+  ".githooks/",
+  # CI/CD and GitHub
+  ".github/",
+  ".gitignore",
+  ".gitlab-ci.yml",
+  ".gitmessage",
+  ".idea/",
+  ".markdownlint.json",
+  ".nvmrc",
+  ".pre-commit-config.yaml",
+  ".secrets.baseline",
+  ".travis.yml",
+  ".vscode/",
+  "CLAUDE.md",
+  "CODE_OF_CONDUCT.md",
+  "CONTRIBUTING.md",
+  "Cargo.lock",
+  # For libraries
+  "GitVersion.yml",
+  "Makefile",
+  "SECURITY.md",
+  "Thumbs.db",
+  # Benchmarks (optional, include if you want them in the package)
+  "benches/",
+  "commitlint.config.js",
+  "deny.toml",
+  # Documentation and community files
+  "docs/",
+  "lcov.info",
+  # Node.js/JavaScript files
+  "node_modules/",
+  "package-lock.json",
+  "package.json",
+  # Build artifacts and caches
+  "target/",
+  # Test files (tests/ should be included for cargo test)
+  # Examples (optional, you might want to include these)
+  # "examples/",
+  "test-data/",
+]
+
+# --- Performance
+# https://nnethercote.github.io/perf-book/title-page.html
+[profile.dev]
+panic = "abort"
+
+# Optimize DEPENDENCY crates even in debug builds. Deps compile once and are
+# cached, so this barely touches the edit→compile loop on our own crates, but it
+# makes debug `cargo run` / `cargo test` execute close to release speed — useful
+# when exercising the parser over real YAML fixtures locally. (Our own crates
+# stay at opt-level 0 for fast incremental rebuilds.)
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+# MAX RUNTIME SPEED. The previous `opt-level = "z"` optimized for *binary size*,
+# which is the opposite of fast (it suppresses inlining/vectorization). `3` is the
+# fastest codegen and the right default for a parser's hot path.
+opt-level = 3
+# Whole-program, cross-crate inlining: the slowest link, the fastest code. Worth
+# it here because the satellite crates (cli/lsp/mcp) inline straight into `skald`.
+lto = "fat"
+# One codegen unit ⇒ the optimizer sees the whole crate at once (no per-unit
+# boundaries to block inlining). Slowest compile, best code.
+codegen-units = 1
+# Drop unwinding tables / landing pads from OUR binaries. (Irrelevant to the
+# published library — a consumer's own profile decides its panic strategy.)
+panic = "abort"
+# Smaller artifacts at zero runtime cost. No debug info is kept here; profile via
+# the `profiling` profile below instead.
+strip = "symbols"
+
+# WASM is downloaded before it runs, so its *size* IS its performance. Keep
+# skald-wasm tuned for a small `.wasm` rather than inheriting the native
+# `opt-level = 3` above (which would bloat the module). `"s"` balances size/speed;
+# switch to `"z"` for the smallest possible module.
+[profile.release.package.skald-wasm]
+opt-level = "s"
+
+# Release-grade codegen but WITH line-table symbols and no stripping, so
+# `cargo flamegraph` / `perf` can attribute samples back to source. The `flame`
+# mise task builds with this profile (`--profile profiling`).
+[profile.profiling]
+inherits = "release"
+debug = "line-tables-only"
+strip = false

@@ -1,0 +1,24 @@
+{
+  "name": "skald-markdownlint",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dev-only Markdown linting toolchain for the skald project, based on GitHub's markdownlint ruleset (@github/markdownlint-github). Not published; the skald library itself is pure Rust with no Node dependency.",
+  "license": "MIT OR Apache-2.0",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24",
+      "onFail": "warn"
+    }
+  },
+  "scripts": {
+    "lint:md": "markdownlint-cli2",
+    "lint:md:fix": "markdownlint-cli2 --fix"
+  },
+  "devDependencies": {
+    "@github/markdownlint-github": "^0.8",
+    "markdown-it": "^14.2",
+    "markdownlint-cli2": "^0.22.1",
+    "markdownlint-cli2-formatter-pretty": "^0.0.10"
+  }
+}

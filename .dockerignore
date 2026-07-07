@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# Build artifacts
+target/
+*.log
+
+# Documentation
+*.md
+!README.md
+docs/
+ROAD_MAP.md
+CONFIGURATION.md
+DOCKER.md
+QUICKSTART.md
+LOCALSTACK.md
+
+# Config examples (we'll mount these)
+config/
+
+# LocalStack
+backend/continuous-development/localstack-init/
+docker-compose.yml
+
+# Scripts
+scripts/
+
+# Environment
+.env
+.env.*
+
+# Test files
+tests/
+*.test
