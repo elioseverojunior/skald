@@ -1,0 +1,56 @@
+[package]
+name = "skald-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+serde.workspace = true
+skald = { workspace = true, features = ["ast", "serde"] }
+skald-ast.workspace = true
+skald-core.workspace = true
+
+[dev-dependencies]
+criterion = { version = "0.8.2", features = ["html_reports"] }
+noyalib = { version = ">=0.0.7" }
+rust-yaml = { version = ">=1" }
+serde-saphyr = { version = ">=0.0.27" }
+serde_json.workspace = true
+serde_yaml_ng = { version = ">=0.10" }
+yaml-rust2 = { version = ">=0.11.0" }
+
+# The library target has no #[bench] functions, but `cargo bench`
+# invokes its default libtest harness anyway and forwards `--` args
+# to it. Forwarding `--output-format bencher` (the flag Criterion
+# accepts) breaks the libtest harness ("error: Unrecognized option:
+# 'output-format'") and aborts the whole `cargo bench` run before
+# any Criterion target runs. Disabling bench on the lib target
+# routes `cargo bench -p skald-bench` straight to the [[bench]]
+# targets below, all of which set harness = false and use Criterion.
+[lib]
+bench = false
+
+[[bench]]
+name = "scanner"
+harness = false
+
+[[bench]]
+name = "parser"
+harness = false
+
+[[bench]]
+name = "composer"
+harness = false
+
+[[bench]]
+name = "emitter"
+harness = false
+
+[[bench]]
+name = "serde"
+harness = false
+
+[[bench]]
+name = "end_to_end"
+harness = false

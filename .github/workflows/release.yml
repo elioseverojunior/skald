@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Top-level read-all; individual jobs escalate only the permissions they need.
+permissions: read-all
+
+jobs:
+  package:
+    name: Package crates
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
+    steps:
+      - uses: actions/checkout@v7  # v7.0.0
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable  # latest
+
+      - name: Package crates
+        run: |
+          mkdir -p dist
+          for c in skald-core skald-ast skald-serde skald skald-cst; do
+            cargo package -p "$c" --no-verify --allow-dirty
+          done
+          cp target/package/*.crate dist/ || true
+
+      - name: Compute hashes
+        id: hash
+        working-directory: dist
+        run: echo "hashes=$(sha256sum ./*.crate | base64 -w0)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7  # v7.0.1
+        with:
+          name: crates
+          path: dist/*.crate
+
+  provenance:
+    name: SLSA L3 provenance
+    needs: [package]
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
+    with:
+      base64-subjects: ${{ needs.package.outputs.hashes }}
+      upload-assets: true
+
+  sign:
+    name: Sigstore signing
+    needs: [package]
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4  # v4 — latest stable major for download-artifact
+        with:
+          name: crates
+          path: dist
+
+      - uses: sigstore/cosign-installer@v4.1.2  # v4.1.2
+
+      - name: Sign crates (keyless OIDC)
+        run: |
+          for f in dist/*.crate; do
+            cosign sign-blob --yes "$f" --bundle "$f.cosign.bundle"
+          done
+
+      - uses: actions/upload-artifact@v7  # v7.0.1
+        with:
+          name: signatures
+          path: dist/*.cosign.bundle

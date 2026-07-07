@@ -1,0 +1,3 @@
+# Local audits. Populate with `cargo vet certify <crate> <version>` as
+# dependencies are reviewed. Empty is valid for an unaudited starting point.
+[audits]

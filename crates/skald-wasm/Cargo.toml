@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Skald contributors
+# SPDX-License-Identifier: MIT OR Apache-2.0
+[package]
+name = "skald-wasm"
+description = "WebAssembly (wasm-bindgen) bindings for Skald: parse/format/validate/edit YAML in the browser or Node."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+skald = { workspace = true, features = ["ast", "cst", "schema"] }
+wasm-bindgen.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]

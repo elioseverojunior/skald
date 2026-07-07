@@ -1,0 +1,17 @@
+[package]
+name = "skald-lsp"
+description = "Minimal YAML Language Server (diagnostics + formatting) over stdio."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+skald = { workspace = true, features = ["ast", "cst"] }
+
+[[bin]]
+name = "skald-lsp"
+path = "src/main.rs"

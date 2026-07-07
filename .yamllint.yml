@@ -1,0 +1,29 @@
+---
+# yamllint configuration ~ https://yamllint.readthedocs.io
+
+extends: default
+
+# The YAML test-suite submodule is a conformance corpus full of intentionally
+# malformed fixtures — never lint it (also covers manual `yamllint .` runs).
+# pnpm-lock.yaml and node_modules belong to the dev-only Markdown toolchain and
+# are machine-generated, so they are excluded too.
+ignore: |
+  crates/skald-yaml-test-suite/data/
+  pnpm-lock.yaml
+  node_modules/
+  target/
+
+rules:
+  # Allow longer lines than the 80-char default; keep it advisory, not fatal.
+  line-length:
+    max: 120
+    level: warning
+  # Our hand-written configs (lefthook.yml, mise tasks) don't start with `---`.
+  document-start: disable
+  # Commented-out config blocks (e.g. the disabled post-commit job) aren't
+  # indented like surrounding content; don't flag that.
+  comments-indentation: disable
+  # GitHub Actions workflows use `on:` as a mapping key, which YAML 1.1 reads as
+  # a boolean. Don't flag mapping keys for truthiness (values are still checked).
+  truthy:
+    check-keys: false

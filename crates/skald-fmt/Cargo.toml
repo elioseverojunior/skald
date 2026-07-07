@@ -1,0 +1,16 @@
+[package]
+name = "skald-fmt"
+description = "CLI: format YAML safely (trailing-whitespace + final-newline), comment-preserving."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+skald = { workspace = true, features = ["ast", "cst"] }
+
+[[bin]]
+name = "skald-fmt"
+path = "src/main.rs"

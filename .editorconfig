@@ -1,0 +1,36 @@
+# EditorConfig: https://editorconfig.org
+# Enforces consistent indentation across editors (IDEA, VS Code, etc.)
+
+root = true
+
+# All files: Unix line endings, UTF-8, no trailing whitespace
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Rust: 4-space indent (cargo fmt standard)
+[*.rs]
+indent_style = space
+indent_size = 4
+
+# TOML: 2-space indent (standard for config files and Cargo.toml)
+[*.toml]
+indent_style = space
+indent_size = 2
+
+# YAML: 2-space indent
+[*.{yaml,yml}]
+indent_style = space
+indent_size = 2
+
+# JSON: 2-space indent
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Markdown: 2-space indent
+[*.md]
+indent_style = space
+indent_size = 2

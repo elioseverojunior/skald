@@ -1,0 +1,34 @@
+# Single source of truth for workspace-wide cargo build/doc flags.
+#
+# Everything here is honoured by EVERY cargo invocation that walks up to this
+# workspace — mise tasks, CI, manual `cargo …`, and rust-analyzer — so these
+# policies live in exactly one place instead of being duplicated (or, worse,
+# typo'd) per entry point.
+#
+# What is intentionally NOT here:
+#   * docs.rs build flags — docs.rs does not read this file; its knobs live in
+#     `[workspace.metadata.docs.rs]` in the root Cargo.toml.
+#   * toolchain channel/components — those are rustup's domain, in
+#     rust-toolchain.toml.
+#   * `CARGO_TERM_COLOR=always` — kept as a CI-only env (it forces ANSI codes,
+#     which is right for CI logs but wrong for locally-piped output).
+
+[build]
+# Workspace warning gate. `-D warnings` turns every rustc lint into a hard error
+# when compiling a WORKSPACE crate (build / test / clippy / check, locally and in
+# CI). Cargo passes `--cap-lints allow` to registry & git dependencies, so this
+# never fails on third-party crates — only on our own code.
+#
+# This replaces the `RUST_FLAGS: "-D warnings"` that used to sit in ci.yml:
+# `RUST_FLAGS` is not a real variable (the env var is `RUSTFLAGS`), so that gate
+# was a silent no-op. Centralizing it here fixes the typo and de-duplicates it.
+#
+# To make this CI-only instead (e.g. if warnings-as-errors is too aggressive for
+# local/IDE iteration), delete this line and set `RUSTFLAGS: -D warnings` in the
+# CI workflow env instead.
+rustflags = ["-C", "target-cpu=native", "-D", "warnings"]
+
+# Documentation lint gate: promotes rustdoc lints (broken_intra_doc_links,
+# redundant_explicit_links, bare_urls, invalid_html_tags, …) to hard errors so
+# broken docs fail the build instead of printing an ignorable warning.
+rustdocflags = ["-D", "warnings"]

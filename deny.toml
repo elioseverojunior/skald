@@ -1,0 +1,78 @@
+# Supply chain security policy for skald
+# Safety-first YAML 1.2.2 library — zero external deps in skald-core by design
+
+# ==============================================================================
+# License Management
+# ==============================================================================
+
+[licenses]
+# Only allow licenses compatible with skald's dual MIT OR Apache-2.0
+allow = [
+  "Apache-2.0",
+  "MIT",
+  "Unicode-3.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+]
+
+confidence-threshold = 0.8
+
+# Don't warn that permissive licenses in `allow` above (BSD-2/3-Clause, ISC,
+# Zlib, …) aren't present in the current, near-empty dependency graph: the
+# allowlist is intentionally forward-looking, so unused entries are expected
+# until real deps land. (This silences `license-not-encountered`.)
+unused-allowed-license = "allow"
+
+# ==============================================================================
+# Security Advisories — Vulnerability Management
+# ==============================================================================
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/RustSec/advisory-db"]
+
+# No ignored advisories — skald has zero tolerance for known vulnerabilities
+ignore = []
+
+# ==============================================================================
+# Banned Dependencies — Supply Chain Security
+# ==============================================================================
+
+[bans]
+# Deny multiple versions — as a library, skald must not force version conflicts
+multiple-versions = "deny"
+wildcards = "deny"
+highlight = "all"
+
+deny = []
+
+# Skip duplicate version checks for transitive deps brought in by dev-dependencies
+skip = []
+
+# Benchmark-only competitor engines (future dev-deps of skald-bench). Their
+# transitive trees would be exempt from the multiple-versions check — they are
+# NEVER in the shipped skald-* library graph. Empty until skald-bench exists,
+# otherwise cargo-deny warns `unmatched-skip-root` for crates not in the graph.
+# When that crate lands, restore the roots below (serde_yml is intentionally
+# omitted: RUSTSEC-2025-0068, unsound + archived):
+#   { crate = "noyalib" }, { crate = "serde_yaml_ng" }, { crate = "serde-saphyr" },
+#   { crate = "yaml-rust2" }, { crate = "rust-yaml" },
+skip-tree = []
+
+# ==============================================================================
+# Source Control — Repository Security
+# ==============================================================================
+
+[sources]
+# Deny unknown sources — all deps must come from crates.io
+unknown-registry = "deny"
+unknown-git = "deny"
+
+allow-git = []
+
+# crates.io — cargo-deny normalizes the registry to this canonical identifier
+# regardless of the sparse/git protocol, so this single entry covers it (the
+# bare `https://index.crates.io` form never matched → `unmatched-source`).
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

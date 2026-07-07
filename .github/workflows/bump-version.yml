@@ -1,0 +1,58 @@
+name: Bump Cargo Version
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Type of bump'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write # Required to push commits back to the repo
+
+jobs:
+  bump-version:
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7  # v7.0.0
+        with:
+          # Use PR head SHA on pull_request events to avoid synthetic merge commit
+          ref: ${{ github.sha }}
+          fetch-depth: "0"
+          fetch-tags: true
+          token: ${{ github.token }}
+          submodules: true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-edit
+        run: cargo install cargo-edit
+
+      - name: Bump version in Cargo.toml
+        run: |
+          echo "Bumping version using cargo set-version..."
+          cargo set-version --bump ${{ github.event.inputs.bump_type }}
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Get the new version for the commit message
+          NEW_VER=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore: bump version to $NEW_VER [skip ci]"
+          git push

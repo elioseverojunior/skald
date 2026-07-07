@@ -1,0 +1,16 @@
+version = 1
+SPDX-PackageName = "skald"
+SPDX-PackageSupplier = "Skald contributors"
+SPDX-PackageDownloadLocation = "https://github.com/elioetibr/skald"
+
+[[annotations]]
+path = ["**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Elio Severo Junior and contributors"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+[[annotations]]
+path = ["crates/skald-yaml-test-suite/data/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "YAML test suite contributors"
+SPDX-License-Identifier = "MIT"

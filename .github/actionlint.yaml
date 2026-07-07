@@ -1,0 +1,37 @@
+# actionlint configuration ~ https://github.com/rhysd/actionlint
+#
+# actionlint auto-discovers this file at .github/actionlint.yaml (no --config
+# flag needed, mirroring how gitleaks finds .gitleaks.toml and yamllint finds
+# .yamllint.yml). It lints every workflow under .github/workflows for syntax
+# errors, expression typos, shellcheck findings in `run:` scripts, and unknown
+# action inputs.
+
+# Self-hosted runner labels actionlint should treat as valid in `runs-on:`.
+# Every job uses `runs-on: ${{ vars.RUNS_ON }}` — a dynamic expression — so
+# actionlint cannot resolve the label statically and skips the runner-label
+# check for those jobs anyway. `arc-runner-set` is registered here as the
+# Actions Runner Controller (ARC) scale-set label `RUNS_ON` resolves to, so any
+# workflow that hard-codes it instead of the variable still lints clean (custom
+# self-hosted labels are otherwise unknown; GitHub-hosted ones are built in).
+self-hosted-runner:
+  labels:
+    - arc-runner-set
+
+# Configuration variables (the `vars` context) allowed in expressions. Pinning
+# the set turns on actionlint's undefined-variable check: a typo such as
+# `vars.RUNS_ON` then fails the lint instead of silently evaluating to an empty
+# string at runtime. Add new repository/organization variables here as they are
+# introduced. Set to `null` to disable the check entirely.
+config-variables:
+  - RUNS_ON
+
+# Path-specific configurations.
+paths:
+  # Glob pattern relative to the repository root for matching files. The path separator is always '/'.
+  # This example configures any YAML file under the '.github/workflows/' directory.
+  .github/workflows/**/*.{yml,yaml}:
+    # List of regular expressions to filter errors by the error messages.
+    ignore:
+      # Ignore the specific error from shellcheck
+      - 'shellcheck reported issue in this script: SC2086:.+'
+      - 'shellcheck reported issue in this script: SC2129:.+'

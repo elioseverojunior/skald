@@ -1,0 +1,26 @@
+# cargo-sort formatting configuration
+# https://github.com/DevinR528/cargo-sort
+#
+# Specifies TOML formatting rules for cargo-sort's output. This file is
+# auto-discovered at the repo root (no --config flag needed when used from mise).
+#
+# Indentation: 2 spaces (Rust convention, matches .editorconfig)
+indent_count = 2
+indent_style = "space"
+always_trailing_comma = false
+multiline_trailing_comma = true
+space_around_eq = true
+compact_arrays = false
+compact_inline_tables = false
+trailing_newline = true
+key_value_newlines = true
+allowed_blank_lines = 2
+crlf = false
+table_order = [
+  "package",
+  "features",
+  "dependencies",
+  "build-dependencies",
+  "dev-dependencies",
+  "workspace",
+]

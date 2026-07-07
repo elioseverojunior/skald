@@ -1,0 +1,65 @@
+[package]
+name = "skald-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+libfuzzer-sys = ">=0.4"
+skald-core = { path = "../skald-core" }
+skald-ast = { path = "../skald-ast" }
+skald-cst = { path = "../skald-cst" }
+skald-serde = { path = "../skald-serde" }
+
+[[bin]]
+name = "fuzz_scanner"
+path = "fuzz_targets/fuzz_scanner.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_parser"
+path = "fuzz_targets/fuzz_parser.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_round_trip"
+path = "fuzz_targets/fuzz_round_trip.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_limits"
+path = "fuzz_targets/fuzz_limits.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_serde"
+path = "fuzz_targets/fuzz_serde.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_cst_roundtrip"
+path = "fuzz_targets/fuzz_cst_roundtrip.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_lossless_edit"
+path = "fuzz_targets/fuzz_lossless_edit.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_merge_keys"
+path = "fuzz_targets/fuzz_merge_keys.rs"
+test = false
+doc = false

@@ -1,0 +1,99 @@
+name: Nightly Fuzz & Bench
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # 4 AM UTC daily
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fuzz:
+    name: "Fuzz: ${{ matrix.target }}"
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - fuzz_scanner
+          - fuzz_parser
+          - fuzz_round_trip
+          - fuzz_limits
+          - fuzz_serde
+          - fuzz_cst_roundtrip
+          - fuzz_lossless_edit
+          - fuzz_merge_keys
+    steps:
+      - uses: actions/checkout@v7  # v7.0.0
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@nightly  # latest
+
+      - uses: Swatinem/rust-cache@v2  # v2.9.1
+        with:
+          workspaces: crates/skald-fuzz
+
+      - name: Install cargo-fuzz
+        # Prebuilt binary install (~10s) instead of `cargo install --locked`,
+        # which was failing on nightly because cargo-fuzz 0.13.1's locked
+        # transitive dep `rustix 0.36.5` uses internal rustc_attrs that
+        # current nightly no longer permits.
+        uses: taiki-e/install-action@v2  # v2.82.10
+        with:
+          tool: cargo-fuzz
+
+      - name: Run fuzzer (5 min)
+        # The fuzz crate moved to crates/skald-fuzz in the crates/ reorg. cargo-fuzz
+        # resolves its project dir relative to the outer workspace root (it does not
+        # honour the process CWD), so it must be pointed there with --fuzz-dir rather
+        # than relying on working-directory.
+        run: cargo +nightly fuzz run ${{ matrix.target }} --fuzz-dir crates/skald-fuzz -- -max_total_time=300
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7  # v7.0.1
+        with:
+          name: "fuzz-crash-${{ matrix.target }}"
+          path: crates/skald-fuzz/artifacts/
+
+  bench:
+    name: Benchmarks
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7  # v7.0.0
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable  # latest
+
+      - uses: Swatinem/rust-cache@v2  # v2.9.1
+
+      - name: Run benchmarks
+        run: cargo bench -p skald-bench
+
+      - name: Upload results
+        uses: actions/upload-artifact@v7  # v7.0.1
+        with:
+          name: criterion-results
+          path: target/criterion/
+
+  miri:
+    name: Miri (UB / strict-provenance)
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7  # v7.0.0
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@nightly  # latest
+        with:
+          components: miri
+
+      - uses: Swatinem/rust-cache@v2  # v2.9.1
+
+      - name: cargo miri test
+        run: cargo +nightly miri test -p skald-core -p skald-ast
+        env:
+          MIRIFLAGS: "-Zmiri-strict-provenance"

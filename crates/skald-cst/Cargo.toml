@@ -1,0 +1,12 @@
+[package]
+name = "skald-cst"
+description = "Skald lossless concrete syntax tree (CST) for comment-preserving edits."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+skald-core.workspace = true

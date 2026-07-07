@@ -1,0 +1,28 @@
+[package]
+name = "skald"
+description = "Safe YAML for Rust — zero unsafe by default, full YAML 1.2.2 spec compliance, high performance"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["ast", "serde", "cst"]
+ast = ["dep:skald-ast"]
+serde = ["dep:skald-serde", "ast"]
+cst = ["dep:skald-cst"]
+# `schema` implies `cst`: coerce_to_schema takes &mut cst::Document, so the CST
+# feature must be enabled whenever schema is.
+schema = ["dep:skald-schema", "ast", "cst"]
+
+[dependencies]
+serde.workspace = true
+skald-ast = { workspace = true, optional = true }
+skald-core.workspace = true
+skald-cst = { workspace = true, optional = true }
+skald-schema = { workspace = true, optional = true }
+skald-serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+skald-ast.workspace = true
